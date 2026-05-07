@@ -6,10 +6,10 @@ interface ActivityStatsCardProps {
 
 export function ActivityStatsCard({ label, value, sublabel }: ActivityStatsCardProps) {
   return (
-    <div className="rounded-[24px] bg-white p-4 shadow-[0_18px_50px_rgba(17,17,17,0.08)] ring-1 ring-black/5">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-500">{label}</p>
-      <p className="mt-2 text-2xl font-black tracking-tight text-neutral-950">{value}</p>
-      <p className="mt-1 text-xs text-neutral-500">{sublabel}</p>
+    <div className="metric-shimmer rounded-[28px] border border-white/80 bg-white/88 p-4 shadow-[0_18px_42px_rgba(83,50,24,0.08)] backdrop-blur">
+      <p className="text-muted text-[11px] font-semibold uppercase tracking-[0.2em]">{label}</p>
+      <p className="text-ink mt-3 text-3xl font-black tracking-[-0.04em]">{value}</p>
+      <p className="text-muted mt-1 text-xs font-medium">{sublabel}</p>
     </div>
   );
 }

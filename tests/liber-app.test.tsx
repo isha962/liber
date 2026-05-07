@@ -138,6 +138,28 @@ describe("LiberApp core flow", () => {
     expect(screen.queryByRole("button", { name: "Back" })).not.toBeInTheDocument();
   });
 
+  it("shows the premium home hero subtitle and keeps summary stats on home only", () => {
+    render(<LiberApp />);
+
+    expect(screen.getByText("Turn every session into momentum.")).toBeInTheDocument();
+    expect(screen.getByText("Streak")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Books" }));
+    expect(screen.queryByText("Streak")).not.toBeInTheDocument();
+    expect(screen.getByText("My Books")).toBeInTheDocument();
+  });
+
+  it("toggles light and dark mode from the home hero and persists the choice", () => {
+    render(<LiberApp />);
+
+    expect(document.documentElement.dataset.theme).toBe("light");
+    fireEvent.click(screen.getByRole("button", { name: "Dark" }));
+
+    expect(document.documentElement.dataset.theme).toBe("dark");
+    expect(localStorage.getItem("liber-theme")).toBe("dark");
+    expect(screen.getByRole("button", { name: "Light" })).toBeInTheDocument();
+  });
+
   it("exports a transparent share when selected", async () => {
     render(<LiberApp />);
     fireEvent.click(screen.getByRole("button", { name: "Share" }));

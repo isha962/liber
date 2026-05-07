@@ -19,26 +19,26 @@ export function BookForm({ initialStartValue, onSubmit, onUseSample }: BookFormP
   const [startValue, setStartValue] = useState(String(initialStartValue));
 
   return (
-    <div className="rounded-[32px] bg-white p-5 shadow-[0_18px_50px_rgba(17,17,17,0.08)] ring-1 ring-black/5">
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-neutral-500">Add Book</p>
+    <div>
+      <p className="text-muted text-xs font-semibold uppercase tracking-[0.24em]">Add Book</p>
       <div className="mt-4 grid gap-3">
         <input
           value={title}
           onChange={(event) => setTitle(event.target.value)}
           placeholder="Title"
-          className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 outline-none focus:border-[var(--orange)]"
+          className="ui-input rounded-[22px] px-4 py-3.5 text-sm placeholder:text-neutral-400"
         />
         <input
           value={author}
           onChange={(event) => setAuthor(event.target.value)}
           placeholder="Author"
-          className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 outline-none focus:border-[var(--orange)]"
+          className="ui-input rounded-[22px] px-4 py-3.5 text-sm placeholder:text-neutral-400"
         />
         <div className="grid grid-cols-2 gap-3">
           <select
             value={format}
             onChange={(event) => setFormat(event.target.value as BookFormat)}
-            className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 outline-none focus:border-[var(--orange)]"
+            className="ui-input rounded-[22px] px-4 py-3.5 text-sm"
           >
             <option value="physical">Physical</option>
             <option value="kindle">Kindle</option>
@@ -48,7 +48,7 @@ export function BookForm({ initialStartValue, onSubmit, onUseSample }: BookFormP
           <select
             value={progressUnit}
             onChange={(event) => setProgressUnit(event.target.value as ProgressUnit)}
-            className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 outline-none focus:border-[var(--orange)]"
+            className="ui-input rounded-[22px] px-4 py-3.5 text-sm"
           >
             <option value="page">Page mode</option>
             <option value="percent">Percent mode</option>
@@ -59,14 +59,14 @@ export function BookForm({ initialStartValue, onSubmit, onUseSample }: BookFormP
             value={totalPages}
             onChange={(event) => setTotalPages(event.target.value)}
             placeholder="Total pages"
-            className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 outline-none focus:border-[var(--orange)]"
+            className="ui-input rounded-[22px] px-4 py-3.5 text-sm placeholder:text-neutral-400"
           />
           <input
             value={startValue}
             onChange={(event) => setStartValue(event.target.value)}
             placeholder={progressUnit === "page" ? "Start page" : "Start %"}
-            className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 outline-none focus:border-[var(--orange)]"
-          />
+            className="ui-input rounded-[22px] px-4 py-3.5 text-sm placeholder:text-neutral-400"
+        />
         </div>
         <button
           type="button"
@@ -83,14 +83,14 @@ export function BookForm({ initialStartValue, onSubmit, onUseSample }: BookFormP
               Number(startValue) || 0,
             )
           }
-          className="mt-2 rounded-full bg-[var(--orange)] px-5 py-3 text-sm font-bold text-white"
+          className="primary-cta mt-2 rounded-full px-5 py-3.5 text-sm font-bold text-white"
         >
           Add book
         </button>
         <button
           type="button"
           onClick={onUseSample}
-          className="rounded-full border border-neutral-200 px-5 py-3 text-sm font-bold text-neutral-900"
+          className="secondary-cta text-ink rounded-full px-5 py-3.5 text-sm font-bold"
         >
           Use sample book
         </button>

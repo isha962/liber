@@ -49,28 +49,28 @@ export function PdfReader({
     <div
       className={
         isFullscreen
-          ? "fixed inset-0 z-40 flex flex-col bg-neutral-950 px-3 pb-4 pt-4"
-          : "mt-4 space-y-4 pb-28"
+          ? "fixed inset-0 z-40 flex flex-col bg-[linear-gradient(180deg,#0f0d0b_0%,#1a1511_100%)] px-3 pb-4 pt-4"
+          : "mt-4 space-y-4 pb-[120px]"
       }
     >
       <div
         className={
           isFullscreen
-            ? "flex h-full flex-col overflow-hidden rounded-none bg-neutral-950 p-0 text-white"
-            : "rounded-[32px] bg-white p-5 shadow-[0_18px_50px_rgba(17,17,17,0.08)] ring-1 ring-black/5"
+            ? "flex h-full flex-col overflow-hidden rounded-none bg-transparent p-0 text-white"
+            : "panel-card rounded-[34px] p-5"
         }
       >
         <div className={isFullscreen ? "flex items-center justify-between gap-3 px-2 pb-3 pt-4" : ""}>
           <div>
-            <p className={`text-xs font-semibold uppercase tracking-[0.24em] ${isFullscreen ? "text-white/55" : "text-neutral-500"}`}>PDF Reader</p>
-            <h2 className={`mt-2 text-2xl font-black tracking-tight ${isFullscreen ? "text-white" : "text-neutral-950"}`}>{title}</h2>
+            <p className={`text-xs font-semibold uppercase tracking-[0.24em] ${isFullscreen ? "text-white/55" : "text-muted"}`}>PDF Reader</p>
+            <h2 className={`font-display mt-2 text-3xl font-semibold tracking-[-0.03em] ${isFullscreen ? "text-white" : "text-ink"}`}>{title}</h2>
           </div>
           <div className={`flex items-center gap-2 ${isFullscreen ? "" : "mt-5"}`}>
             <button
               type="button"
               aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
               onClick={onToggleFullscreen}
-              className={`rounded-full px-4 py-3 text-sm font-bold ${isFullscreen ? "border border-white/15 bg-white/10 text-white" : "border border-neutral-200 text-neutral-900"}`}
+              className={`rounded-full px-4 py-3 text-sm font-bold ${isFullscreen ? "border border-white/15 bg-white/10 text-white" : "secondary-cta text-ink"}`}
             >
               {isFullscreen ? "Exit" : "Fullscreen"}
             </button>
@@ -78,7 +78,7 @@ export function PdfReader({
               <button
                 type="button"
                 onClick={onEndSession}
-                className="rounded-full bg-[var(--orange)] px-4 py-3 text-sm font-bold text-white"
+                className="primary-cta rounded-full px-4 py-3 text-sm font-bold text-white"
               >
                 End Session
               </button>
@@ -88,7 +88,7 @@ export function PdfReader({
 
         {file ? (
           <div
-            className={`relative mt-5 overflow-hidden ${isFullscreen ? "flex-1 rounded-[28px] bg-neutral-900 px-2 py-3" : "rounded-[24px] bg-neutral-100 p-3"}`}
+            className={`relative mt-5 overflow-hidden ${isFullscreen ? "flex-1 rounded-[34px] border border-white/8 bg-[rgba(255,255,255,0.03)] px-2 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]" : "rounded-[28px] border border-[rgba(17,17,17,0.06)] bg-[rgba(255,252,248,0.92)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]"}`}
           >
             <div
               aria-hidden="true"
@@ -111,22 +111,22 @@ export function PdfReader({
               <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/70 to-transparent px-4 pb-4 pt-12">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      aria-label="Previous page"
-                      onClick={() => onPageChange(Math.max(1, currentPage - 1))}
-                      className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-white/10 text-3xl font-medium text-white"
-                    >
-                      ‹
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Next page"
-                      onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
-                      className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-white/10 text-3xl font-medium text-white"
-                    >
-                      ›
-                    </button>
+                <button
+                  type="button"
+                  aria-label="Previous page"
+                  onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+                  className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-white/10 text-3xl font-medium text-white shadow-[0_14px_24px_rgba(0,0,0,0.18)]"
+                >
+                  ‹
+                </button>
+                <button
+                  type="button"
+                  aria-label="Next page"
+                  onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+                  className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-white/10 text-3xl font-medium text-white shadow-[0_14px_24px_rgba(0,0,0,0.18)]"
+                >
+                  ›
+                </button>
                   </div>
                   <p className="text-sm font-bold text-white/80">
                     Page {currentPage} / {totalPages}
@@ -136,9 +136,9 @@ export function PdfReader({
             ) : null}
           </div>
         ) : (
-          <div className={`mt-5 rounded-[24px] p-4 text-sm leading-6 ${isFullscreen ? "bg-white/5 text-white/70" : "bg-neutral-50 text-neutral-500"}`}>
-            {missingMessage ?? "Re-upload this PDF to continue reading."}
-          </div>
+            <div className={`mt-5 rounded-[24px] p-4 text-sm leading-6 ${isFullscreen ? "bg-white/5 text-white/70" : "bg-[rgba(255,255,255,0.45)] text-muted"}`}>
+              {missingMessage ?? "Re-upload this PDF to continue reading."}
+            </div>
         )}
 
         {!isFullscreen ? (
@@ -148,18 +148,18 @@ export function PdfReader({
                 type="button"
                 aria-label="Previous page"
                 onClick={() => onPageChange(Math.max(1, currentPage - 1))}
-                className="flex h-12 w-12 items-center justify-center rounded-full border border-neutral-200 text-3xl font-medium text-neutral-900"
+                className="secondary-cta text-ink flex h-12 w-12 items-center justify-center rounded-full text-3xl font-medium"
               >
                 ‹
               </button>
-              <p className="text-sm font-bold text-neutral-600">
+              <p className="text-muted text-sm font-bold">
                 Page {currentPage} / {totalPages}
               </p>
               <button
                 type="button"
                 aria-label="Next page"
                 onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
-                className="flex h-12 w-12 items-center justify-center rounded-full border border-neutral-200 text-3xl font-medium text-neutral-900"
+                className="secondary-cta text-ink flex h-12 w-12 items-center justify-center rounded-full text-3xl font-medium"
               >
                 ›
               </button>
@@ -168,7 +168,7 @@ export function PdfReader({
             <button
               type="button"
               onClick={onEndSession}
-              className="mt-5 w-full rounded-full bg-[var(--orange)] px-5 py-3 text-base font-bold text-white"
+              className="primary-cta mt-5 w-full rounded-full px-5 py-3.5 text-base font-bold text-white"
             >
               End Session
             </button>
