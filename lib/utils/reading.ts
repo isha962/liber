@@ -65,7 +65,6 @@ export function startSession(bookId: string, startValue: number, progressUnit: P
     startedAt: new Date().toISOString(),
     startValue,
     progressUnit,
-    note: "",
     caffeineAmount: 0,
   };
 }

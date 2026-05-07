@@ -38,7 +38,6 @@ export interface ReadingSession {
   startPage?: number;
   endPage?: number;
   progressUnit: ProgressUnit;
-  note: string;
   caffeineAmount: number;
   durationMinutes?: number;
   durationSeconds?: number;
@@ -74,5 +73,4 @@ export interface ShareCard {
   progressAfter: number;
   streakCount: number;
   caffeineAmount: number;
-  note?: string;
 }

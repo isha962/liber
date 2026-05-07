@@ -13,13 +13,50 @@ import { demoBooks, demoSessions, demoUser, sampleBook } from "@/lib/mock-data/d
 import type { Book, ReadingSession, SessionSummaryData, ShareCard, ShareVariant, User } from "@/lib/types";
 import { calculateDurationSeconds, calculatePagesRead, createSessionSummary, getAutoStartPage, startSession } from "@/lib/utils/reading";
 import { createPdfBookFromUpload, extractPdfMetadata, updatePdfBookProgress } from "@/lib/utils/pdf";
-import { loadPdfObjectUrl, savePdfFile } from "@/lib/utils/pdf-storage";
+import { loadPdfFile, savePdfFile } from "@/lib/utils/pdf-storage";
 import { downloadShareCard, shareCardImage } from "@/lib/utils/share";
 import { buildShareCardFromSession } from "@/lib/utils/share-card";
 import { formatDurationFromSeconds } from "@/lib/utils/time";
 
 type Screen = "home" | "setup" | "active" | "reader" | "summary" | "share";
 const STORAGE_KEY = "liber-mvp-state-v2";
+
+function StepperControl({
+  label,
+  value,
+  onDecrease,
+  onIncrease,
+}: {
+  label: string;
+  value: number;
+  onDecrease: () => void;
+  onIncrease: () => void;
+}) {
+  return (
+    <div className="rounded-[20px] bg-neutral-50 px-4 py-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">{label}</p>
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <button
+          type="button"
+          aria-label={`Decrease ${label.toLowerCase()}`}
+          onClick={onDecrease}
+          className="flex h-11 w-11 items-center justify-center rounded-full border border-neutral-200 bg-white text-2xl font-bold text-neutral-900"
+        >
+          −
+        </button>
+        <p className="text-3xl font-black text-neutral-950">{value}</p>
+        <button
+          type="button"
+          aria-label={`Increase ${label.toLowerCase()}`}
+          onClick={onIncrease}
+          className="flex h-11 w-11 items-center justify-center rounded-full border border-neutral-200 bg-white text-2xl font-bold text-neutral-900"
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function formatDurationLabel(startedAt: string, endedAt?: string) {
   if (!endedAt) return "0s";
@@ -35,15 +72,16 @@ export function LiberApp() {
   const [activeBookId, setActiveBookId] = useState<string>(demoBooks[0]?.id ?? "");
   const [pendingSession, setPendingSession] = useState<ReadingSession | null>(null);
   const [endValue, setEndValue] = useState("");
-  const [note, setNote] = useState("");
   const [caffeineAmount, setCaffeineAmount] = useState("0");
   const [latestSummary, setLatestSummary] = useState<SessionSummaryData | null>(null);
   const [shareCard, setShareCard] = useState<ShareCard | null>(buildShareCardFromSession(demoSessions[0], demoBooks[0]));
   const [shareVariant, setShareVariant] = useState<ShareVariant>("black");
   const [shareFeedback, setShareFeedback] = useState("");
   const [sessionError, setSessionError] = useState("");
-  const [pdfReaderUrl, setPdfReaderUrl] = useState<string | null>(null);
+  const [pdfReaderFile, setPdfReaderFile] = useState<File | null>(null);
   const [pdfReaderMessage, setPdfReaderMessage] = useState("");
+  const [pdfFullscreen, setPdfFullscreen] = useState(false);
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const exportNodeRef = useRef<HTMLDivElement | null>(null);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -86,10 +124,22 @@ export function LiberApp() {
       ),
     [sessions],
   );
+  const recentSessions = shareableSessions.slice(0, 3);
 
   const previewScale = Math.min(300 / shareExportMeta.width, 534 / shareExportMeta.height);
   const livePagesRead =
-    pendingSession && Number.isFinite(Number(endValue)) ? calculatePagesRead(pendingSession.startValue, Number(endValue)) : 0;
+    (pendingSession || editingSessionId) && Number.isFinite(Number(endValue))
+      ? calculatePagesRead(
+          editingSessionId
+            ? sessions.find((session) => session.id === editingSessionId)?.startPage ??
+                sessions.find((session) => session.id === editingSessionId)?.startValue ??
+                0
+            : pendingSession?.startValue ?? 0,
+          Number(endValue),
+        )
+      : 0;
+  const editingSession = editingSessionId ? sessions.find((session) => session.id === editingSessionId) ?? null : null;
+  const sectionClass = "mt-4 space-y-4 pb-[120px]";
 
   function primaryTab() {
     if (screen === "setup") return "books" as const;
@@ -98,6 +148,8 @@ export function LiberApp() {
   }
 
   function onNav(tab: "home" | "books" | "session" | "share") {
+    setPdfFullscreen(false);
+    setEditingSessionId(null);
     if (tab === "books") setScreen("setup");
     else if (tab === "session") setScreen("active");
     else setScreen(tab);
@@ -128,11 +180,10 @@ export function LiberApp() {
     const book = createPdfBookFromUpload({
       fileId,
       metadata,
-      fileUrl: URL.createObjectURL(file),
     });
     setBooks((current) => [book, ...current]);
     setActiveBookId(book.id);
-    setPdfReaderUrl(book.fileUrl ?? null);
+    setPdfReaderFile(file);
     setScreen("active");
   }
 
@@ -142,8 +193,8 @@ export function LiberApp() {
     session.sourceType = book.sourceType;
     session.startPage = startValue;
     setPendingSession(session);
+    setEditingSessionId(null);
     setEndValue(String(startValue));
-    setNote("");
     setCaffeineAmount("0");
     setSessionError("");
 
@@ -154,29 +205,27 @@ export function LiberApp() {
 
   async function openPdfReader(book: Book) {
     setPdfReaderMessage("");
-    if (book.fileUrl) {
-      setPdfReaderUrl(book.fileUrl);
+    if (pdfReaderFile && activeBookId === book.id) {
       setScreen("reader");
       return;
     }
 
     if (!book.fileId) {
       setPdfReaderMessage("Re-upload this PDF to continue reading.");
-      setPdfReaderUrl(null);
+      setPdfReaderFile(null);
       setScreen("reader");
       return;
     }
 
-    const restoredUrl = await loadPdfObjectUrl(book.fileId).catch(() => null);
-    if (!restoredUrl) {
+    const restoredFile = await loadPdfFile(book.fileId).catch(() => null);
+    if (!restoredFile) {
       setPdfReaderMessage("Re-upload this PDF to continue reading.");
-      setPdfReaderUrl(null);
+      setPdfReaderFile(null);
       setScreen("reader");
       return;
     }
 
-    setPdfReaderUrl(restoredUrl);
-    setBooks((current) => current.map((entry) => (entry.id === book.id ? { ...entry, fileUrl: restoredUrl } : entry)));
+    setPdfReaderFile(restoredFile);
     setScreen("reader");
   }
 
@@ -213,7 +262,6 @@ export function LiberApp() {
       endValue: endPage,
       startPage: pendingSession.startPage ?? pendingSession.startValue,
       endPage,
-      note,
       caffeineAmount: Number(caffeineAmount) || 0,
       durationMinutes: summary.minutesRead,
       durationSeconds: calculateDurationSeconds(new Date(pendingSession.startedAt), endedAt),
@@ -235,6 +283,7 @@ export function LiberApp() {
     setShareCard(buildShareCardFromSession(completed, activeBook));
     setPendingSession(null);
     setScreen("summary");
+    setPdfFullscreen(false);
   }
 
   function finishSession() {
@@ -271,7 +320,6 @@ export function LiberApp() {
       endValue: parsedEnd,
       startPage: pendingSession.startPage ?? pendingSession.startValue,
       endPage: parsedEnd,
-      note,
       caffeineAmount: parsedCaffeine,
       durationMinutes: summary.minutesRead,
       durationSeconds: calculateDurationSeconds(new Date(pendingSession.startedAt), endedAt),
@@ -294,6 +342,95 @@ export function LiberApp() {
     setShareCard(buildShareCardFromSession(completed, activeBook));
     setPendingSession(null);
     setScreen("summary");
+    setSessionError("");
+  }
+
+  function stepPendingEndPage(delta: number) {
+    if ((!pendingSession && !editingSession) || !activeBook) return;
+    const startPage = editingSession ? (editingSession.startPage ?? editingSession.startValue) : (pendingSession?.startValue ?? 0);
+    const current = Number(endValue) || startPage;
+    const next = Math.min(activeBook.totalPages, Math.max(startPage, current + delta));
+    setEndValue(String(next));
+  }
+
+  function stepPendingCaffeine(delta: number) {
+    const current = Number(caffeineAmount) || 0;
+    const next = Math.min(5, Math.max(0, current + delta));
+    setCaffeineAmount(String(next));
+  }
+
+  function openSessionWrapUp() {
+    if (!pendingSession || !activeBook) return;
+    const currentEndPage = activeBook.sourceType === "pdf" ? activeBook.currentPage : pendingSession.startValue;
+    setEndValue(String(currentEndPage));
+    setScreen("summary");
+    setPdfFullscreen(false);
+  }
+
+  function openEditSession(sessionId: string) {
+    const session = sessions.find((entry) => entry.id === sessionId);
+    const book = books.find((entry) => entry.id === session?.bookId);
+    if (!session || !book || typeof session.endedAt !== "string") return;
+    setActiveBookId(book.id);
+    setPendingSession(null);
+    setEditingSessionId(session.id);
+    setEndValue(String(session.endPage ?? session.endValue ?? session.startPage ?? session.startValue));
+    setCaffeineAmount(String(session.caffeineAmount));
+    setSessionError("");
+    setScreen("summary");
+  }
+
+  function saveEditedSession() {
+    if (!editingSession || !activeBook || typeof editingSession.endedAt !== "string") return;
+    const parsedEnd = Number(endValue);
+    const parsedCaffeine = Math.min(5, Math.max(0, Number(caffeineAmount) || 0));
+    const startPage = editingSession.startPage ?? editingSession.startValue;
+    if (!Number.isFinite(parsedEnd) || parsedEnd < startPage) {
+      setSessionError("End page must be at least your start page.");
+      return;
+    }
+
+    const summary = createSessionSummary({
+      bookTotalPages: activeBook.totalPages,
+      startValue: startPage,
+      endValue: parsedEnd,
+      progressUnit: "page",
+      startedAt: editingSession.startedAt,
+      endedAt: editingSession.endedAt,
+      previousStreak: Math.max(0, (editingSession.streakDay ?? 1) - 1),
+      lastSessionDate: user.lastSessionDate,
+      caffeineAmount: parsedCaffeine,
+    });
+
+    const updatedSession: ReadingSession = {
+      ...editingSession,
+      endValue: parsedEnd,
+      endPage: parsedEnd,
+      caffeineAmount: parsedCaffeine,
+      durationMinutes: summary.minutesRead,
+      durationSeconds: calculateDurationSeconds(new Date(editingSession.startedAt), new Date(editingSession.endedAt)),
+      pagesRead: summary.pagesRead,
+      progressBefore: summary.progressBefore,
+      progressAfter: summary.progressAfter,
+      streakDay: editingSession.streakDay ?? summary.streakDay,
+    };
+
+    const updatedSessions = sessions.map((session) => (session.id === updatedSession.id ? updatedSession : session));
+    setSessions(updatedSessions);
+    setBooks((current) =>
+      current.map((book) => (book.id === activeBook.id ? { ...book, currentPage: updatedSession.endPage ?? book.currentPage } : book)),
+    );
+    setUser((current) => ({
+      ...current,
+      totalPagesRead: updatedSessions.reduce((sum, session) => sum + (session.pagesRead ?? 0), 0),
+      totalMinutesRead: updatedSessions.reduce((sum, session) => sum + (session.durationMinutes ?? 0), 0),
+    }));
+    setLatestSummary({
+      ...summary,
+      streakDay: updatedSession.streakDay ?? summary.streakDay,
+    });
+    setShareCard(buildShareCardFromSession(updatedSession, activeBook));
+    setEditingSessionId(null);
     setSessionError("");
   }
 
@@ -349,7 +486,7 @@ export function LiberApp() {
           </h1>
         </section>
 
-        {screen !== "share" ? (
+        {screen === "home" ? (
           <section className="mt-4 grid grid-cols-3 gap-3">
             <ActivityStatsCard label="Streak" value={`${user.streakCount}`} sublabel="days" />
             <ActivityStatsCard label="Pages" value={`${todayPages}`} sublabel="today" />
@@ -358,7 +495,7 @@ export function LiberApp() {
         ) : null}
 
         {screen === "home" ? (
-          <section className="mt-4 space-y-4">
+          <section className={sectionClass}>
             <div className="rounded-[32px] bg-white p-5 shadow-[0_18px_50px_rgba(17,17,17,0.08)] ring-1 ring-black/5">
               {activeBook ? (
                 <>
@@ -379,15 +516,52 @@ export function LiberApp() {
                 </>
               )}
             </div>
+            <div className="rounded-[32px] bg-white p-5 shadow-[0_18px_50px_rgba(17,17,17,0.08)] ring-1 ring-black/5">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-neutral-500">Recent Activity</p>
+              {shareableSessions[0] ? (
+                <>
+                  <p className="mt-3 text-sm font-bold text-neutral-950">
+                    {books.find((book) => book.id === shareableSessions[0]?.bookId)?.title ?? "Recent session"}
+                  </p>
+                  <p className="mt-1 text-sm text-neutral-500">
+                    {shareableSessions[0].pagesRead} pages · {formatDurationLabel(shareableSessions[0].startedAt, shareableSessions[0].endedAt)}
+                  </p>
+                </>
+              ) : (
+                <p className="mt-3 text-sm text-neutral-500">No sessions yet. Start one from the Session tab.</p>
+              )}
+            </div>
           </section>
         ) : null}
 
         {screen === "setup" ? (
-          <section className="mt-4 space-y-4 pb-4">
-            <BookForm initialStartValue={1} onSubmit={handleAddBook} onUseSample={handleUseSample} />
+          <section className={sectionClass}>
             <div className="rounded-[32px] bg-white p-5 shadow-[0_18px_50px_rgba(17,17,17,0.08)] ring-1 ring-black/5">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-neutral-500">Your books</p>
-              <div className="mt-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-neutral-500">My Books</p>
+              <div className="mt-4 space-y-3">
+                {books.length === 0 ? (
+                  <div className="rounded-[24px] bg-neutral-50 p-4 text-sm text-neutral-500">
+                    No books yet. Add your first book or upload a PDF below.
+                  </div>
+                ) : null}
+                {books.map((book) => (
+                  <div key={book.id} className="rounded-[24px] bg-neutral-50 px-4 py-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-bold text-neutral-950">{book.title}</p>
+                        <p className="mt-1 text-sm text-neutral-500">{book.author || book.fileName || "Untitled PDF"}</p>
+                      </div>
+                      <button type="button" onClick={() => setActiveBookId(book.id)} className={`rounded-full px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] ${book.id === activeBookId ? "bg-[var(--orange)] text-white" : "bg-white text-[var(--orange)]"}`}>
+                        {book.id === activeBookId ? "Selected" : "Select"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-[32px] bg-white p-5 shadow-[0_18px_50px_rgba(17,17,17,0.08)] ring-1 ring-black/5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-neutral-500">Add a Book</p>
                 <input
                   ref={uploadInputRef}
                   type="file"
@@ -408,28 +582,15 @@ export function LiberApp() {
                   Upload PDF
                 </button>
               </div>
-              <div className="mt-4 space-y-3">
-                {books.length === 0 ? <div className="rounded-[24px] bg-neutral-50 p-4 text-sm text-neutral-500">No books yet. Add a book first.</div> : null}
-                {books.map((book) => (
-                  <div key={book.id} className="rounded-[24px] bg-neutral-50 px-4 py-4">
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <p className="text-sm font-bold text-neutral-950">{book.title}</p>
-                        <p className="mt-1 text-sm text-neutral-500">{book.author || book.fileName || "Untitled PDF"}</p>
-                      </div>
-                      <button type="button" onClick={() => setActiveBookId(book.id)} className={`rounded-full px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] ${book.id === activeBookId ? "bg-[var(--orange)] text-white" : "bg-white text-[var(--orange)]"}`}>
-                        {book.id === activeBookId ? "Selected" : "Select"}
-                      </button>
-                    </div>
-                  </div>
-                ))}
+              <div className="mt-4">
+                <BookForm initialStartValue={1} onSubmit={handleAddBook} onUseSample={handleUseSample} />
               </div>
             </div>
           </section>
         ) : null}
 
         {screen === "active" ? (
-          <section className="mt-4 space-y-4 pb-6">
+          <section className={sectionClass}>
             {!activeBook ? (
               <div className="rounded-[32px] bg-white p-5 shadow-[0_18px_50px_rgba(17,17,17,0.08)] ring-1 ring-black/5">
                 <p className="text-sm text-neutral-500">No books yet. Add a book first.</p>
@@ -446,12 +607,12 @@ export function LiberApp() {
                       <button type="button" onClick={() => void openPdfReader(activeBook)} className="rounded-full border border-neutral-200 px-5 py-3 text-sm font-bold text-neutral-900">
                         Resume PDF
                       </button>
-                      <button type="button" onClick={finishPdfSession} className="rounded-full bg-[var(--orange)] px-5 py-3 text-sm font-bold text-white">
+                      <button type="button" onClick={openSessionWrapUp} className="rounded-full bg-[var(--orange)] px-5 py-3 text-sm font-bold text-white">
                         End session
                       </button>
                     </div>
                   ) : (
-                    <button type="button" onClick={() => setScreen("summary")} className="mt-5 w-full rounded-full bg-[var(--orange)] px-5 py-3 text-base font-bold text-white">
+                    <button type="button" onClick={openSessionWrapUp} className="mt-5 w-full rounded-full bg-[var(--orange)] px-5 py-3 text-base font-bold text-white">
                       End session
                     </button>
                   )}
@@ -469,9 +630,10 @@ export function LiberApp() {
                 </div>
                 <div className="rounded-[32px] bg-white p-5 shadow-[0_18px_50px_rgba(17,17,17,0.08)] ring-1 ring-black/5">
                   <p className="text-xs font-semibold uppercase tracking-[0.24em] text-neutral-500">Session History</p>
+                  {shareableSessions.length > 3 ? <p className="mt-2 text-xs text-neutral-500">Showing latest 3 sessions.</p> : null}
                   <div className="mt-4 space-y-3">
                     {shareableSessions.length === 0 ? <div className="rounded-[24px] bg-neutral-50 p-4 text-sm text-neutral-500">No sessions yet. Start one from the Session tab.</div> : null}
-                    {shareableSessions.map((session) => {
+                    {recentSessions.map((session) => {
                       const book = books.find((entry) => entry.id === session.bookId);
                       return (
                         <div key={session.id} className="rounded-[24px] bg-neutral-50 p-4">
@@ -481,9 +643,14 @@ export function LiberApp() {
                               <p className="mt-1 text-sm text-neutral-500">{session.pagesRead} pages · {session.durationMinutes} min</p>
                               <p className="mt-1 text-xs font-medium uppercase tracking-[0.18em] text-neutral-400">{session.endedAt?.slice(0, 10)}</p>
                             </div>
-                            <button type="button" onClick={() => openShareForSession(session.id)} className="rounded-full bg-white px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-[var(--orange)]">
-                              Share
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <button type="button" onClick={() => openEditSession(session.id)} className="rounded-full bg-white px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-neutral-700">
+                                Edit
+                              </button>
+                              <button type="button" onClick={() => openShareForSession(session.id)} className="rounded-full bg-white px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-[var(--orange)]">
+                                Share
+                              </button>
+                            </div>
                           </div>
                         </div>
                       );
@@ -498,43 +665,51 @@ export function LiberApp() {
         {screen === "reader" && activeBook ? (
           <PdfReader
             title={activeBook.title}
-            fileUrl={pdfReaderUrl}
+            file={pdfReaderFile}
             currentPage={activeBook.currentPage}
             totalPages={activeBook.totalPages}
             onPageChange={updateCurrentPdfPage}
-            onEndSession={finishPdfSession}
+            onEndSession={openSessionWrapUp}
+            isFullscreen={pdfFullscreen}
+            onToggleFullscreen={() => setPdfFullscreen((current) => !current)}
             missingMessage={pdfReaderMessage}
           />
         ) : null}
 
         {screen === "summary" ? (
-          <section className="mt-4 space-y-4 pb-8">
-            {pendingSession && activeBook ? (
+          <section className="mt-4 space-y-4 pb-[140px]">
+            {(pendingSession || editingSession) && activeBook ? (
               <div className="rounded-[32px] bg-white p-5 shadow-[0_18px_50px_rgba(17,17,17,0.08)] ring-1 ring-black/5">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-neutral-500">End Session</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-neutral-500">{editingSession ? "Edit Session" : "End Session"}</p>
                 <h2 className="mt-2 text-2xl font-black tracking-tight text-neutral-950">What page did you finish on?</h2>
                 <p className="mt-4 text-sm font-bold text-neutral-900">Starting page</p>
-                <p className="mt-1 text-xl font-black text-neutral-950">{pendingSession.startValue}</p>
+                <p className="mt-1 text-xl font-black text-neutral-950">{editingSession ? (editingSession.startPage ?? editingSession.startValue) : pendingSession?.startValue}</p>
                 <div className="mt-4 grid gap-3">
-                  <input value={endValue} onChange={(event) => setEndValue(event.target.value)} placeholder="End page" className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 outline-none focus:border-[var(--orange)]" />
+                  <StepperControl
+                    label="End page"
+                    value={Number(endValue) || editingSession?.endPage || pendingSession?.startValue || 0}
+                    onDecrease={() => stepPendingEndPage(-1)}
+                    onIncrease={() => stepPendingEndPage(1)}
+                  />
                   <div className="rounded-[20px] bg-neutral-50 px-4 py-3">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">Pages read</p>
                     <p className="mt-2 text-2xl font-black text-neutral-950">{livePagesRead}</p>
                   </div>
-                  <label className="grid gap-2 text-sm font-medium text-neutral-700">
-                    <span>Caffeine amount</span>
-                    <input aria-label="Caffeine amount" min="0" max="5" value={caffeineAmount} onChange={(event) => setCaffeineAmount(event.target.value)} className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 outline-none focus:border-[var(--orange)]" />
-                  </label>
-                  <textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="Add a note if you want" rows={4} className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 outline-none focus:border-[var(--orange)]" />
+                  <StepperControl
+                    label="Caffeine"
+                    value={Number(caffeineAmount) || 0}
+                    onDecrease={() => stepPendingCaffeine(-1)}
+                    onIncrease={() => stepPendingCaffeine(1)}
+                  />
                 </div>
                 {sessionError ? <p className="mt-4 text-sm font-medium text-red-600">{sessionError}</p> : null}
-                <button type="button" onClick={finishSession} className="mt-5 w-full rounded-full bg-[var(--orange)] px-5 py-3 text-base font-bold text-white">
-                  Save session
+                <button type="button" onClick={editingSession ? saveEditedSession : finishSession} className="mt-5 w-full rounded-full bg-[var(--orange)] px-5 py-3 text-base font-bold text-white">
+                  {editingSession ? "Update session" : "Save session"}
                 </button>
               </div>
             ) : latestSummary && shareCard ? (
               <>
-                <SessionSummary summary={latestSummary} note={shareCard.note} />
+                <SessionSummary summary={latestSummary} />
                 <button type="button" onClick={() => setScreen("share")} className="w-full rounded-full bg-[var(--orange)] px-5 py-3 text-base font-bold text-white">
                   Generate Share Card
                 </button>
@@ -586,9 +761,6 @@ export function LiberApp() {
                   <button type="button" onClick={handleShare} className="rounded-full bg-[var(--orange)] px-5 py-3 text-base font-bold text-white">
                     Share
                   </button>
-                  <button type="button" onClick={() => setScreen("home")} className="rounded-full border border-neutral-200 px-5 py-3 text-base font-bold text-neutral-900">
-                    Back to Home
-                  </button>
                 </div>
                 {shareFeedback ? <p className="mt-3 text-sm text-neutral-500">{shareFeedback}</p> : null}
               </div>
@@ -603,7 +775,7 @@ export function LiberApp() {
         ) : null}
       </div>
 
-      <BottomNav activeTab={primaryTab()} onSelect={onNav} />
+      {!pdfFullscreen ? <BottomNav activeTab={primaryTab()} onSelect={onNav} /> : null}
     </main>
   );
 }

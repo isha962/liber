@@ -31,6 +31,5 @@ export function buildShareCardFromSession(session: ReadingSession, book: Book): 
     progressAfter: session.progressAfter,
     streakCount: session.streakDay,
     caffeineAmount: session.caffeineAmount,
-    note: session.note,
   };
 }

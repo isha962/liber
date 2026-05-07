@@ -34,7 +34,6 @@ export const demoSessions: ReadingSession[] = [
     endPage: 43,
     sourceType: "manual",
     progressUnit: "page",
-    note: "",
     caffeineAmount: 2,
     durationMinutes: 2,
     durationSeconds: 123,

@@ -30,20 +30,33 @@ function StatStack({
   );
 }
 
-export function ReadingRouteStoryShare({ card, variant = "black" }: { card: ShareCard; variant?: ShareVariant }) {
+export function ReadingRouteStoryShare({
+  card,
+  variant = "black",
+}: {
+  card: ShareCard;
+  variant?: ShareVariant;
+}) {
+  const titleClass =
+    card.bookTitle.length > 32
+      ? "text-[62px] leading-[0.98]"
+      : card.bookTitle.length > 22
+        ? "text-[72px] leading-[0.97]"
+        : "text-[82px] leading-[0.96]";
+
   return (
-    <div className={`flex h-full w-full flex-col items-center overflow-hidden px-16 pb-20 pt-24 text-white ${variant === "black" ? "bg-black" : "bg-transparent"}`}>
+    <div className={`flex h-full w-full flex-col items-center overflow-hidden px-16 pb-[120px] pt-24 text-white ${variant === "black" ? "bg-black" : "bg-transparent"}`}>
       <div className="mb-16 flex w-full justify-center text-[var(--orange)]">
         <HeroBookIllustration className="h-auto w-[210px] max-w-[65%]" />
       </div>
       <p className="text-[20px] font-bold tracking-[-0.01em] text-white/70">READING SESSION</p>
-      <h1 className="mt-5 max-w-[920px] text-center text-[82px] font-black leading-[0.96] tracking-[-0.05em] text-balance">{card.bookTitle}</h1>
+      <h1 className={`mt-5 max-w-[920px] text-center font-black tracking-[-0.05em] text-balance ${titleClass}`}>{card.bookTitle}</h1>
 
-      <div className="mt-12 flex w-full max-w-[420px] flex-col items-center">
+      <div className="mt-10 flex w-full max-w-[420px] flex-col items-center">
         <StatStack label="Pages" value={`${card.endPage}`} />
         <StatStack label="Pace" value={`${card.pagesPerHour}`} inlineUnit="pages/hr" />
         <StatStack label="Time" value={card.durationShortLabel} />
-        <div className="mb-[120px] flex flex-col items-center text-center">
+        <div className="mb-[92px] flex flex-col items-center text-center">
           <p className="text-[26px] font-bold tracking-[-0.01em] text-white/72">Caffeine</p>
           <div className="mt-1 flex items-end justify-center gap-4">
             <CaffeineIcon filled={card.caffeineAmount > 0} className="h-24 w-24 text-[var(--orange)]" />
@@ -52,11 +65,11 @@ export function ReadingRouteStoryShare({ card, variant = "black" }: { card: Shar
         </div>
       </div>
 
-      <div className="-mt-10 flex h-[420px] w-[980px] max-w-full items-center justify-center">
-        <ReadingRouteProgress startPage={card.startPage} endPage={card.endPage} totalPages={card.totalPages} />
+      <div className="-mt-2 flex h-[320px] w-[880px] max-w-full items-center justify-center">
+        <ReadingRouteProgress title={card.bookTitle} startPage={card.startPage} endPage={card.endPage} totalPages={card.totalPages} />
       </div>
 
-      <div className="mt-auto pt-3 text-center">
+      <div className="mt-auto pt-2 text-center">
         <p className="text-[40px] font-black tracking-[-0.04em] text-white">{card.endPage} / {card.totalPages} pages</p>
         <p className="mt-1 text-[22px] font-bold tracking-[-0.02em] text-white/54">{Math.round(card.progressAfter)}% completed</p>
       </div>

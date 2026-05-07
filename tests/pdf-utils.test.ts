@@ -75,7 +75,6 @@ describe("pdf utilities", () => {
       startPage: 10,
       endPage: 14,
       progressUnit: "page",
-      note: "",
       caffeineAmount: 1,
       durationMinutes: 2,
       durationSeconds: 123,

@@ -38,7 +38,6 @@ describe("reading utilities", () => {
         startValue: 24,
         endValue: 52,
         progressUnit: "page",
-        note: "",
         caffeineAmount: 1,
         durationMinutes: 20,
         pagesRead: 28,

@@ -20,7 +20,7 @@ vi.mock("@/lib/utils/pdf", async () => {
 
 vi.mock("@/lib/utils/pdf-storage", () => ({
   savePdfFile: vi.fn(async () => undefined),
-  loadPdfObjectUrl: vi.fn(async () => "blob:restored-pdf"),
+  loadPdfFile: vi.fn(async () => new File(["pdf-content"], "Uploaded PDF.pdf", { type: "application/pdf" })),
 }));
 
 import { LiberApp } from "@/components/LiberApp";
@@ -52,8 +52,9 @@ describe("LiberApp core flow", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Start session" }));
     fireEvent.click(await screen.findByRole("button", { name: "End session" }));
     expect(await screen.findByText("What page did you finish on?")).toBeInTheDocument();
-    fireEvent.change(screen.getByPlaceholderText("End page"), { target: { value: "52" } });
-    fireEvent.change(screen.getByLabelText("Caffeine amount"), { target: { value: "2" } });
+    for (let i = 0; i < 28; i += 1) fireEvent.click(screen.getByRole("button", { name: "Increase end page" }));
+    fireEvent.click(screen.getByRole("button", { name: "Increase caffeine" }));
+    fireEvent.click(screen.getByRole("button", { name: "Increase caffeine" }));
     expect(screen.getByText("28")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Save session" }));
     fireEvent.click(await screen.findByRole("button", { name: "Generate Share Card" }));
@@ -62,6 +63,71 @@ describe("LiberApp core flow", () => {
     expect(screen.getAllByText("The Midnight Library").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Page 52").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/52 \/ 304 pages/i).length).toBeGreaterThan(0);
+  });
+
+  it("saves caffeine from the end-session form and keeps summary read-only", async () => {
+    render(<LiberApp />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Books" }));
+    fireEvent.change(screen.getByPlaceholderText("Title"), { target: { value: "The Midnight Library" } });
+    fireEvent.change(screen.getByPlaceholderText("Author"), { target: { value: "Matt Haig" } });
+    fireEvent.change(screen.getByPlaceholderText("Start page"), { target: { value: "24" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add book" }));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Start session" }));
+    fireEvent.click(await screen.findByRole("button", { name: "End session" }));
+    for (let i = 0; i < 28; i += 1) fireEvent.click(screen.getByRole("button", { name: "Increase end page" }));
+    fireEvent.click(screen.getByRole("button", { name: "Increase caffeine" }));
+    fireEvent.click(screen.getByRole("button", { name: "Increase caffeine" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save session" }));
+
+    const stored = JSON.parse(localStorage.getItem("liber-mvp-state-v2") ?? "{}");
+    expect(stored.sessions?.[0]?.caffeineAmount).toBe(2);
+    expect(screen.queryByRole("button", { name: "Increase caffeine" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Generate Share Card" }));
+    expect(screen.getAllByText("Caffeine").length).toBeGreaterThan(0);
+  });
+
+  it("uses the simplified share flow without note or display toggles", async () => {
+    render(<LiberApp />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Books" }));
+    fireEvent.change(screen.getByPlaceholderText("Title"), { target: { value: "The Midnight Library" } });
+    fireEvent.change(screen.getByPlaceholderText("Author"), { target: { value: "Matt Haig" } });
+    fireEvent.change(screen.getByPlaceholderText("Start page"), { target: { value: "24" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add book" }));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Start session" }));
+    fireEvent.click(await screen.findByRole("button", { name: "End session" }));
+    for (let i = 0; i < 28; i += 1) fireEvent.click(screen.getByRole("button", { name: "Increase end page" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save session" }));
+    expect(screen.queryByText("Customize share")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Generate Share Card" }));
+
+    expect(screen.getAllByText("YOU ARE HERE").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Show note on share card")).not.toBeInTheDocument();
+  });
+
+  it("edits a completed session in place and updates the share card", async () => {
+    render(<LiberApp />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Session" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+    expect(await screen.findByText("Edit Session")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Increase end page" }));
+    fireEvent.click(screen.getByRole("button", { name: "Increase caffeine" }));
+    fireEvent.click(screen.getByRole("button", { name: "Update session" }));
+
+    const stored = JSON.parse(localStorage.getItem("liber-mvp-state-v2") ?? "{}");
+    expect(stored.sessions).toHaveLength(1);
+    expect(stored.sessions?.[0]?.endPage).toBe(44);
+    expect(stored.sessions?.[0]?.caffeineAmount).toBe(3);
+
+    fireEvent.click(screen.getByRole("button", { name: "Generate Share Card" }));
+
+    expect(screen.getAllByText("Page 44").length).toBeGreaterThan(0);
   });
 
   it("has no back button on books or session", () => {
@@ -105,10 +171,28 @@ describe("LiberApp core flow", () => {
     expect(stored.books?.[0]?.currentPage).toBe(3);
 
     fireEvent.click(screen.getByRole("button", { name: "End Session" }));
+    expect(await screen.findByText("What page did you finish on?")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Save session" }));
     expect(await screen.findByText("Session saved")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Generate Share Card" }));
 
     expect(screen.getAllByText("Uploaded PDF").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Page 3").length).toBeGreaterThan(0);
+  });
+
+  it("supports fullscreen PDF reading and hides the bottom nav there", async () => {
+    render(<LiberApp />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Books" }));
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(["pdf-content"], "Uploaded PDF.pdf", { type: "application/pdf" });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Read PDF" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Enter fullscreen" }));
+
+    expect(screen.queryByRole("button", { name: "Home" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Exit fullscreen" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Next page" })).toBeInTheDocument();
   });
 });

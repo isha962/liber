@@ -9,7 +9,7 @@ function SummaryMetric({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function SessionSummary({ summary, note }: { summary: SessionSummaryData; note?: string }) {
+export function SessionSummary({ summary }: { summary: SessionSummaryData }) {
   return (
     <div className="rounded-[32px] bg-white p-5 shadow-[0_18px_50px_rgba(17,17,17,0.08)] ring-1 ring-black/5">
       <div className="flex items-center justify-between">
@@ -25,16 +25,10 @@ export function SessionSummary({ summary, note }: { summary: SessionSummaryData;
         <SummaryMetric label="Pace" value={`${summary.pagesPerHour}/hr`} />
         <SummaryMetric label="Progress" value={`${summary.progressBefore}% → ${summary.progressAfter}%`} />
       </div>
-      <div className="mt-4 rounded-[24px] border border-neutral-200 bg-white px-4 py-3">
+      <div className="mt-4 rounded-[24px] border border-neutral-200 bg-white px-4 py-4">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">Caffeine</p>
-        <p className="mt-2 text-lg font-bold text-neutral-950">{summary.caffeineAmount}</p>
+        <p className="mt-3 text-3xl font-black tracking-tight text-neutral-950">{summary.caffeineAmount}</p>
       </div>
-      {note ? (
-        <div className="mt-4 rounded-[24px] bg-neutral-950 p-4 text-white">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/60">Note</p>
-          <p className="mt-2 text-sm leading-6 text-white/90">{note}</p>
-        </div>
-      ) : null}
     </div>
   );
 }
